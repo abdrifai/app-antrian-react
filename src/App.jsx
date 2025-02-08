@@ -1,5 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = "https://xehglwqyjrdciumpiteh.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlaGdsd3F5anJkY2l1bXBpdGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkwMDI2NDUsImV4cCI6MjA1NDU3ODY0NX0.bQHP2uReu6f9Gw98Un9I_Ogw7FYR1OCaHW-grAQLwqw";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 function Card({ children, className = "" }) {
     return (
@@ -32,12 +37,34 @@ export default function QueueApp() {
     const [currentCall, setCurrentCall] = useState(null);
     const lastCalledRef = useRef(null);
 
+    useEffect(() => {
+        fetchQueue();
+    }, []);
+
+    // Ambil data antrian dari Supabase
+    const fetchQueue = async () => {
+        const { data, error } = await supabase
+            .from("queue")
+            .select("number, name")
+            .order("number", { ascending: true });
+
+        if (!error) {
+            setQueue(data || []);
+            setCounter(data.length > 0 ? data[data.length - 1].number + 1 : 1);
+        }
+    };
+
     // Tambah Antrian dengan Nama
-    const addQueue = () => {
+    const addQueue = async () => {
         if (nameInput.trim() !== "") {
-            setQueue((prev) => [...prev, { number: counter, name: nameInput.trim() }]);
-            setCounter((prev) => prev + 1);
-            setNameInput("");
+            const newEntry = { number: counter, name: nameInput.trim() };
+            const { error } = await supabase.from("queue").insert(newEntry);
+
+            if (!error) {
+                setQueue((prev) => [...prev, newEntry]);
+                setCounter((prev) => prev + 1);
+                setNameInput("");
+            }
         }
     };
 
@@ -57,7 +84,13 @@ export default function QueueApp() {
             playSound(next.number, next.name);
             setCurrentCall(next);
             setQueue((prev) => prev.slice(1));
+            deleteQueue(next.number);
         }
+    };
+
+    // Hapus antrian yang telah dipanggil
+    const deleteQueue = async (number) => {
+        await supabase.from("queue").delete().eq("number", number);
     };
 
     // Panggil Ulang Antrian Terakhir
