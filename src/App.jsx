@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { createClient } from "@supabase/supabase-js";
+import { format } from "date-fns";
+import { id as localeId } from "date-fns/locale";
 
 const supabaseUrl = "https://xehglwqyjrdciumpiteh.supabase.co";
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhlaGdsd3F5anJkY2l1bXBpdGVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzkwMDI2NDUsImV4cCI6MjA1NDU3ODY0NX0.bQHP2uReu6f9Gw98Un9I_Ogw7FYR1OCaHW-grAQLwqw";
@@ -36,6 +38,28 @@ export default function QueueApp() {
     const [nameInput, setNameInput] = useState("");
     const [currentCall, setCurrentCall] = useState(null);
     const lastCalledRef = useRef(null);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [currentDate, setCurrentDate] = useState("");
+    const [currentTime, setCurrentTime] = useState("");
+
+    const filteredQueue = queue.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    useEffect(() => {
+        const updateDateTime = () => {
+            const now = new Date();
+            const formattedDate = format(now, "dd MMMM yyyy", { locale: localeId });
+            const formattedTime = format(now, "HH:mm");
+            setCurrentDate(formattedDate);
+            setCurrentTime(formattedTime);
+        };
+
+        updateDateTime();
+        const timer = setInterval(updateDateTime, 1000); // Perbarui waktu setiap detik
+        return () => clearInterval(timer);
+    }, []);
+
 
     useEffect(() => {
         fetchQueue();
@@ -69,10 +93,20 @@ export default function QueueApp() {
     };
 
     // Fungsi untuk memutar suara panggilan
+    // const playSound = (number, name) => {
+    //     const message = `Antrian nomor ${number} atas nama ${name}`;
+    //     const utterance = new SpeechSynthesisUtterance(message);
+    //     utterance.lang = "id-ID";
+    //     window.speechSynthesis.speak(utterance);
+    // };
     const playSound = (number, name) => {
+        window.speechSynthesis.cancel(); // Hentikan semua suara yang sedang berjalan
         const message = `Antrian nomor ${number} atas nama ${name}`;
         const utterance = new SpeechSynthesisUtterance(message);
         utterance.lang = "id-ID";
+        utterance.onstart = () => console.log("Memulai pemutaran suara");
+        utterance.onerror = (e) => console.error("Terjadi kesalahan:", e);
+        utterance.onend = () => console.log("Pemutaran selesai");
         window.speechSynthesis.speak(utterance);
     };
 
@@ -104,7 +138,24 @@ export default function QueueApp() {
 
     return (
         <div className="min-h-screen p-8 bg-gray-50 flex flex-col items-center">
-            <h1 className="text-3xl font-bold mb-6">Antrian Pemberkasan PPPK Tahap 1 Kab. Tojo Una-Una</h1>
+
+            {/* Tanggal Sekarang */}
+            <div className="mb-6 flex flex-col md:flex-row gap-8 items-center mt-4">
+
+                {/* Tanggal Sekarang */}
+                <div className="flex flex-col items-center bg-blue-100 px-6 py-4 rounded-2xl shadow-lg">
+                    <p className="text-lg font-semibold text-gray-700">Tanggal Hari Ini</p>
+                    <p className="text-2xl font-bold text-blue-800">{currentDate}</p>
+                </div>
+
+                {/* Waktu Sekarang */}
+                <div className="flex flex-col items-center bg-green-100 px-6 py-4 rounded-2xl shadow-lg">
+                    <p className="text-lg font-semibold text-gray-700">Waktu Sekarang</p>
+                    <p className="text-2xl font-bold text-green-800">{currentTime}</p>
+                </div>
+            </div>
+
+            <h1 className="text-3xl font-bold mb-10">Antrian Pemberkasan PPPK Tahap 1 Kab. Tojo Una-Una</h1>
 
             {currentCall && (
                 <div className="mb-8 p-4 bg-blue-100 rounded-xl text-center shadow-md">
@@ -115,9 +166,9 @@ export default function QueueApp() {
 
             <motion.div
                 className="grid grid-cols-2 gap-16"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.8 }}
+                initial={{opacity: 0}}
+                animate={{opacity: 1}}
+                transition={{duration: 0.8}}
             >
                 <div className="space-y-8">
                     <Card className="p-4">
@@ -160,18 +211,28 @@ export default function QueueApp() {
                 </div>
 
                 <div className="max-w-md">
-                    <h2 className="text-2xl font-bold mb-4">Daftar Antrian:</h2>
-                    {queue.length === 0 ? (
-                        <p className="text-gray-600">Tidak ada antrian.</p>
-                    ) : (
-                        <ul className="list-disc list-inside space-y-2">
-                            {queue.map((item, index) => (
-                                <li key={index} className="text-lg">
-                                    Antrian {item.number}: {item.name}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold">Daftar Antrian:</h2>
+                        <input
+                            type="text"
+                            placeholder="Cari nama..."
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-1/2 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-400"
+                        />
+                    </div>
+                    <div className="h-96 w-[450px] overflow-y-scroll border rounded-lg p-4 bg-white">
+                        {filteredQueue.length === 0 ? (
+                            <p className="text-gray-600">Tidak ada antrian.</p>
+                        ) : (
+                            <ul className="list-disc list-inside space-y-2">
+                                {filteredQueue.map((item, index) => (
+                                    <li key={index} className="text-lg">
+                                        Antrian {item.number}: {item.name}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
                 </div>
             </motion.div>
         </div>
